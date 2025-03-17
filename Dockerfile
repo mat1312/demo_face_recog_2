@@ -16,7 +16,10 @@ RUN apt-get update && apt-get install -y \
 
 # Copia i file del progetto
 COPY . /app
-
+# Copia la cartella static per includere immagini di test
+# Copia la cartella delle immagini di riferimento (Meloni)
+COPY meloni_images /app/meloni_images
+COPY static /app/static
 # Crea un virtual environment per le dipendenze
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
