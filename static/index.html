@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🇮🇹 Meloni Detector | Riconoscimento facciale</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Font personalizzati -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🇮🇹</text></svg>">
+    
+    <style>
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #121826;
+        }
+        
+        .italian-flag-gradient {
+            background: linear-gradient(90deg, #008C45 33%, #F4F9F0 33%, #F4F9F0 66%, #CD212A 66%);
+        }
+        
+        .drop-zone {
+            border: 2px dashed #4B5563;
+            transition: all 0.3s ease;
+        }
+        
+        .drop-zone:hover, .drop-zone.active {
+            border-color: #3B82F6;
+            background-color: rgba(59, 130, 246, 0.05);
+        }
+        
+        .tooltip {
+            visibility: hidden;
+            position: absolute;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #374151;
+            color: white;
+            padding: 5px 10px;
+            border-radius: 6px;
+            white-space: nowrap;
+            transition: visibility 0.2s, opacity 0.2s;
+            opacity: 0;
+            z-index: 10;
+        }
+        
+        .tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #374151 transparent transparent transparent;
+        }
+        
+        .tooltip-container:hover .tooltip {
+            visibility: visible;
+            opacity: 1;
+        }
+        
+        .animate-pulse-slow {
+            animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.7;
+            }
+        }
+
+        .result-animation {
+            animation: fadeInUp 0.5s ease-out;
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .loader {
+            border-top-color: #3B82F6;
+            animation: spinner 1.5s linear infinite;
+        }
+        
+        @keyframes spinner {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-gray-200">
+    <!-- Intestazione -->
+    <header class="pt-6 pb-4 px-4 md:px-0">
+        <div class="container mx-auto">
+            <div class="flex flex-col items-center">
+                <h1 class="text-4xl md:text-5xl font-bold text-center mb-2">
+                    <span class="text-green-600">🇮🇹 Meloni</span> 
+                    <span class="text-white">Detector</span> 
+                    <span class="text-red-600">🇮🇹</span>
+                </h1>
+                <p class="text-xl text-gray-400 italic text-center mb-4">Riconosci Giorgia Meloni in qualsiasi immagine</p>
+                
+                <!-- Banner tricolore -->
+                <div class="italian-flag-gradient h-2 w-full max-w-3xl rounded-full mb-6"></div>
+                
+                <!-- Badge FastAPI -->
+                <div class="bg-gray-800 py-1 px-3 rounded-full text-xs text-gray-300 flex items-center mb-2">
+                    <span class="inline-block w-2 h-2 rounded-full bg-blue-500 mr-1.5"></span>
+                    Powered by FastAPI
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="container mx-auto px-4 md:px-0 pb-16">
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Colonna di input -->
+            <div class="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-2xl font-semibold mb-6 flex items-center">
+                    <span class="bg-green-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">1</span>
+                    Seleziona un'immagine
+                </h2>
+                
+                <!-- Pannello informazioni -->
+                <div class="bg-blue-900/30 border-l-4 border-blue-500 p-4 rounded-r-lg mb-6">
+                    <p class="text-blue-200 font-medium">
+                        Carica un'immagine o usa la demo per cercare Giorgia Meloni. Le foto con volti chiari e ben illuminati daranno i migliori risultati.
+                    </p>
+                </div>
+                
+                <!-- Status API -->
+                <div id="api-status" class="hidden mb-4 px-4 py-3 rounded-md bg-gray-700/50">
+                    <div class="flex items-center">
+                        <div id="status-icon" class="mr-3 flex-shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                        </div>
+                        <p id="status-text" class="text-sm text-gray-300">Controllo stato API...</p>
+                    </div>
+                </div>
+                
+                <!-- Toggle demo/upload -->
+                <div class="flex items-center justify-between mb-6 bg-gray-700/50 p-4 rounded-lg">
+                    <label for="use-demo" class="flex items-center cursor-pointer">
+                        <input type="checkbox" id="use-demo" class="sr-only peer" checked>
+                        <div class="relative w-11 h-6 bg-gray-600 rounded-full peer peer-checked:bg-green-600 peer-focus:ring-2 peer-focus:ring-green-300 dark:peer-focus:ring-green-800 transition-colors">
+                            <div class="absolute left-0.5 top-0.5 bg-white w-5 h-5 rounded-full transition-all peer-checked:left-5"></div>
+                        </div>
+                        <span class="ml-3 text-gray-200 font-medium">Usa immagine di dimostrazione</span>
+                    </label>
+                    <span class="bg-green-600/20 text-green-400 py-1 px-3 rounded-full text-xs font-medium">Raccomandato</span>
+                </div>
+                
+                <!-- Area demo image -->
+                <div id="demo-image-container" class="mb-6">
+                    <div class="bg-gray-700/50 p-3 rounded-lg mb-3">
+                        <p class="text-green-400 font-medium flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            Usando l'immagine di dimostrazione
+                        </p>
+                    </div>
+                    <div class="relative bg-gray-900 rounded-lg overflow-hidden shadow-lg">
+                        <img id="demo-image" src="/static/foto_gruppo.jpg" alt="Immagine di dimostrazione" class="w-full h-auto object-cover">
+                    </div>
+                </div>
+                
+                <!-- Area Upload -->
+                <div id="upload-container" class="hidden">
+                    <div class="drop-zone w-full rounded-lg p-8 text-center cursor-pointer mb-6" id="dropzone">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <p class="mb-2 text-base text-gray-300 font-medium">
+                            <span class="font-semibold">Clicca per caricare</span> o trascina qui l'immagine
+                        </p>
+                        <p class="text-xs text-gray-500">PNG, JPG o JPEG (Max. 10MB)</p>
+                        <input id="fileInput" type="file" class="hidden" accept="image/png, image/jpeg, image/jpg" />
+                    </div>
+                    
+                    <div id="preview-container" class="hidden">
+                        <div class="bg-gray-700/50 p-3 rounded-lg mb-3">
+                            <p class="text-blue-400 font-medium flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                Immagine caricata
+                            </p>
+                        </div>
+                        <div class="relative bg-gray-900 rounded-lg overflow-hidden shadow-lg">
+                            <img id="preview-image" src="#" alt="Preview" class="w-full h-auto object-cover">
+                            <button id="remove-image" class="absolute top-2 right-2 bg-red-500 p-1 rounded-full hover:bg-red-600 transition-colors">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Colonna di output -->
+            <div class="bg-gray-800 rounded-2xl p-6 shadow-xl">
+                <h2 class="text-2xl font-semibold mb-6 flex items-center">
+                    <span class="bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">2</span>
+                    Analisi
+                </h2>
+                
+                <div id="analysis-placeholder" class="min-h-[200px] flex flex-col items-center justify-center p-10 mb-6 bg-gray-700/30 rounded-xl">
+                    <div id="initial-placeholder" class="text-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 mx-auto text-gray-500 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <p class="text-gray-400 text-lg mb-2">Nessuna analisi effettuata</p>
+                        <p class="text-gray-500">Premi il pulsante "Analizza immagine" per iniziare</p>
+                    </div>
+                    
+                    <div id="loading-placeholder" class="hidden text-center w-full">
+                        <div class="loader mx-auto mb-4 w-12 h-12 border-4 border-gray-600 border-t-4 rounded-full"></div>
+                        <p class="text-gray-300 text-lg mb-2">Analisi in corso...</p>
+                        <p class="text-gray-400" id="loading-status">Rilevamento volti...</p>
+                        <div class="w-full bg-gray-700 rounded-full h-2.5 mt-4 mb-2">
+                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="result-container" class="hidden w-full"></div>
+                </div>
+                
+                <!-- Bottone analisi -->
+                <div class="flex justify-center mb-8">
+                    <button id="analyze-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-full shadow-lg transform transition-all duration-300 hover:scale-105 hover:shadow-xl flex items-center space-x-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                        <span>Analizza immagine</span>
+                    </button>
+                </div>
+                
+                <!-- Risultato (inizialmente nascosto) -->
+                <div id="result-output" class="hidden">
+                    <div id="result-image-container" class="mb-6">
+                        <img id="result-image" src="#" alt="Risultato analisi" class="w-full h-auto object-cover rounded-lg shadow-lg">
+                    </div>
+                    
+                    <div id="download-container" class="flex justify-center">
+                        <a id="download-button" href="#" download class="bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-full shadow flex items-center space-x-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            <span>Scarica immagine risultato</span>
+                        </a>
+                    </div>
+                </div>
+                
+                <!-- Legenda -->
+                <div class="mt-6">
+                    <h3 class="text-lg font-semibold mb-3">Legenda</h3>
+                    <div class="bg-white bg-opacity-10 p-4 rounded-lg">
+                        <div class="flex items-center mb-3">
+                            <div class="w-6 h-6 bg-green-500 rounded mr-3"></div>
+                            <div class="text-gray-200 font-medium">Riquadro <span class="text-green-400 font-semibold">VERDE</span>: Meloni identificata</div>
+                        </div>
+                        <div class="flex items-center">
+                            <div class="w-6 h-6 bg-red-500 rounded mr-3"></div>
+                            <div class="text-gray-200 font-medium">Riquadro <span class="text-red-400 font-semibold">ROSSO</span>: Altra persona</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Sezione controlli avanzati -->
+        <div class="mt-8 bg-gray-800 rounded-2xl p-6 shadow-xl">
+            <h2 class="text-2xl font-semibold mb-6 flex items-center">
+                <span class="bg-purple-600 text-white rounded-full w-8 h-8 flex items-center justify-center mr-3">3</span>
+                Impostazioni avanzate
+            </h2>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Sensibilità -->
+                <div>
+                    <label for="sensitivity" class="block text-sm font-medium text-gray-300 mb-2">Livello di sensibilità</label>
+                    <div class="flex items-center">
+                        <input type="range" id="sensitivity" min="0.1" max="1" step="0.01" value="0.58"
+                               class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer">
+                        <span id="sensitivity-value" class="ml-3 text-sm font-medium text-gray-300 w-12">0.58</span>
+                    </div>
+                    <div id="sensitivity-label" class="mt-2 text-sm font-medium text-blue-400">
+                        Sensibilità: Bilanciata
+                    </div>
+                    <p class="mt-1 text-sm text-gray-400">
+                        Valori più bassi = riconoscimento più preciso ma meno sensibile.<br>
+                        Valori più alti = più possibilità di riconoscere, ma rischio di falsi positivi.
+                    </p>
+                </div>
+                
+                <!-- Documentazione API -->
+                <div class="bg-gray-700/30 p-4 rounded-lg">
+                    <h3 class="text-base font-semibold text-gray-200 mb-2 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1.5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Info sul riconoscimento
+                    </h3>
+                    <p class="text-sm text-gray-300">
+                        Questo tool utilizza face_recognition con backend FastAPI per identificare Giorgia Meloni nelle immagini.
+                    </p>
+                    <p class="text-sm text-gray-400 mt-2">
+                        I migliori risultati si ottengono con foto frontali ben illuminate.
+                    </p>
+                    <a href="/docs" target="_blank" class="mt-3 inline-flex items-center text-sm font-medium text-blue-400 hover:text-blue-300">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                        Documentazione API Swagger
+                    </a>
+                </div>
+            </div>
+        </div>
+    </main>
+    
+    <footer class="bg-gray-900 py-6 mt-8">
+        <div class="container mx-auto px-4 md:px-0">
+            <div class="italian-flag-gradient h-1 w-full max-w-md mx-auto mb-6 rounded-full"></div>
+            <p class="text-center text-gray-500 text-sm">
+                Meloni Detector &copy; 2025 | Made with ❤️ in Italy | Powered by FastAPI
+            </p>
+        </div>
+    </footer>
+
+    <script>
+        // Controlla lo stato dell'API al caricamento
+        document.addEventListener('DOMContentLoaded', checkApiStatus);
+        
+        function checkApiStatus() {
+            const statusContainer = document.getElementById('api-status');
+            const statusIcon = document.getElementById('status-icon');
+            const statusText = document.getElementById('status-text');
+            
+            statusContainer.classList.remove('hidden');
+            
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    statusIcon.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                    `;
+                    statusText.textContent = `API connessa | ${data.encodings} codifiche caricate da ${data.reference_images} immagini`;
+                    statusText.className = 'text-sm text-green-300';
+                    setTimeout(() => {
+                        statusContainer.classList.add('hidden');
+                    }, 3000);
+                })
+                .catch(error => {
+                    statusIcon.innerHTML = `
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                        </svg>
+                    `;
+                    statusText.textContent = 'Impossibile connettersi all\'API. Ricarica la pagina o contatta l\'amministratore.';
+                    statusText.className = 'text-sm text-red-300';
+                });
+        }
+        
+        // Gestione toggle demo/upload
+        const useDemoCheckbox = document.getElementById('use-demo');
+        const demoContainer = document.getElementById('demo-image-container');
+        const uploadContainer = document.getElementById('upload-container');
+        
+        useDemoCheckbox.addEventListener('change', function() {
+            if (this.checked) {
+                demoContainer.classList.remove('hidden');
+                uploadContainer.classList.add('hidden');
+            } else {
+                demoContainer.classList.add('hidden');
+                uploadContainer.classList.remove('hidden');
+            }
+        });
+        
+        // Gestione caricamento immagine
+        const dropzone = document.getElementById('dropzone');
+        const fileInput = document.getElementById('fileInput');
+        const previewContainer = document.getElementById('preview-container');
+        const previewImage = document.getElementById('preview-image');
+        const removeImageBtn = document.getElementById('remove-image');
+        
+        dropzone.addEventListener('click', () => fileInput.click());
+        
+        dropzone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropzone.classList.add('active');
+        });
+        
+        dropzone.addEventListener('dragleave', () => {
+            dropzone.classList.remove('active');
+        });
+        
+        dropzone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropzone.classList.remove('active');
+            
+            if (e.dataTransfer.files.length) {
+                fileInput.files = e.dataTransfer.files;
+                handleFileUpload();
+            }
+        });
+        
+        fileInput.addEventListener('change', handleFileUpload);
+        
+        function handleFileUpload() {
+            if (fileInput.files.length) {
+                const file = fileInput.files[0];
+                
+                if (file.size > 10 * 1024 * 1024) {
+                    alert('Il file è troppo grande. La dimensione massima è 10MB.');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImage.src = e.target.result;
+                    dropzone.classList.add('hidden');
+                    previewContainer.classList.remove('hidden');
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+        
+        removeImageBtn.addEventListener('click', () => {
+            fileInput.value = '';
+            previewContainer.classList.add('hidden');
+            dropzone.classList.remove('hidden');
+        });
+        
+        // Gestione sensibilità
+        const sensitivitySlider = document.getElementById('sensitivity');
+        const sensitivityValue = document.getElementById('sensitivity-value');
+        const sensitivityLabel = document.getElementById('sensitivity-label');
+        
+        sensitivitySlider.addEventListener('input', updateSensitivityLabel);
+        
+        function updateSensitivityLabel() {
+            const value = parseFloat(sensitivitySlider.value);
+            sensitivityValue.textContent = value.toFixed(2);
+            
+            let label = "";
+            if (value < 0.4) {
+                label = "Molto precisa";
+                sensitivityLabel.className = "mt-2 text-sm font-medium text-purple-400";
+            } else if (value < 0.55) {
+                label = "Precisa";
+                sensitivityLabel.className = "mt-2 text-sm font-medium text-blue-400";
+            } else if (value < 0.7) {
+                label = "Bilanciata";
+                sensitivityLabel.className = "mt-2 text-sm font-medium text-green-400";
+            } else {
+                label = "Alta (possibili falsi positivi)";
+                sensitivityLabel.className = "mt-2 text-sm font-medium text-yellow-500";
+            }
+            
+            sensitivityLabel.textContent = `Sensibilità: ${label}`;
+        }
+        
+        // Gestione analisi
+        const analyzeButton = document.getElementById('analyze-button');
+        const initialPlaceholder = document.getElementById('initial-placeholder');
+        const loadingPlaceholder = document.getElementById('loading-placeholder');
+        const resultContainer = document.getElementById('result-container');
+        const resultOutput = document.getElementById('result-output');
+        const resultImage = document.getElementById('result-image');
+        const loadingStatus = document.getElementById('loading-status');
+        const progressBar = document.getElementById('progress-bar');
+        const downloadButton = document.getElementById('download-button');
+        
+        analyzeButton.addEventListener('click', startAnalysis);
+        
+        function startAnalysis() {
+            // Disabilita il pulsante durante l'analisi
+            analyzeButton.disabled = true;
+            analyzeButton.classList.add('opacity-50', 'cursor-not-allowed');
+            
+            // Mostra il caricamento
+            initialPlaceholder.classList.add('hidden');
+            loadingPlaceholder.classList.remove('hidden');
+            resultContainer.classList.add('hidden');
+            resultOutput.classList.add('hidden');
+            
+            // Simula il progresso mentre avviene l'elaborazione
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += 1;
+                progressBar.style.width = `${progress}%`;
+                
+                if (progress < 30) {
+                    loadingStatus.textContent = "Rilevamento volti...";
+                } else if (progress < 70) {
+                    loadingStatus.textContent = "Confronto con database Meloni...";
+                } else {
+                    loadingStatus.textContent = "Elaborazione risultati...";
+                }
+                
+                if (progress >= 100) {
+                    clearInterval(interval);
+                }
+            }, 30);
+            
+            // Determina se usare l'immagine demo o quella caricata
+            if (useDemoCheckbox.checked) {
+                // Analisi con immagine demo
+                const tolerance = parseFloat(sensitivitySlider.value);
+                fetch(`/api/demo?tolerance=${tolerance}`)
+                    .then(response => response.json())
+                    .then(result => {
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
+                        showResults(result);
+                    })
+                    .catch(error => {
+                        clearInterval(interval);
+                        showError("Si è verificato un errore durante l'analisi: " + error.message);
+                    })
+                    .finally(() => {
+                        // Riabilita il pulsante
+                        analyzeButton.disabled = false;
+                        analyzeButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                    });
+            } else {
+                // Analisi con immagine caricata
+                if (!fileInput.files.length) {
+                    clearInterval(interval);
+                    showError("Nessuna immagine caricata. Carica un'immagine prima di analizzare.");
+                    analyzeButton.disabled = false;
+                    analyzeButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                    return;
+                }
+                
+                const reader = new FileReader();
+                reader.onload = e => {
+                    const imageData = e.target.result;
+                    const tolerance = parseFloat(sensitivitySlider.value);
+                    
+                    // Prepara i dati per l'API
+                    const requestData = {
+                        image: imageData,
+                        tolerance: tolerance
+                    };
+                    
+                    // Chiamata API per analizzare l'immagine
+                    fetch('/api/analyze', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(requestData)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        clearInterval(interval);
+                        progressBar.style.width = '100%';
+                        showResults(result);
+                    })
+                    .catch(error => {
+                        clearInterval(interval);
+                        showError("Si è verificato un errore durante l'analisi: " + error.message);
+                    })
+                    .finally(() => {
+                        // Riabilita il pulsante
+                        analyzeButton.disabled = false;
+                        analyzeButton.classList.remove('opacity-50', 'cursor-not-allowed');
+                    });
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+        
+        function showResults(result) {
+            loadingPlaceholder.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            resultOutput.classList.remove('hidden');
+            
+            if (result.error) {
+                showError(result.error);
+                return;
+            }
+            
+            // Popola il contenitore con i risultati
+            if (result.found) {
+                resultContainer.innerHTML = `
+                    <div class="result-animation bg-green-100 border-l-4 border-green-500 p-4 rounded-r-lg mb-6 text-green-800">
+                        <p class="font-bold flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                            </svg>
+                            ${result.message}!
+                        </p>
+                    </div>
+                    
+                    <div class="result-animation bg-white bg-opacity-10 p-4 rounded-lg mb-6">
+                        <h3 class="text-lg font-semibold mb-2 text-white">Confidenza massima</h3>
+                        <div class="flex items-center">
+                            <div class="w-full bg-gray-700 rounded-full h-6">
+                                <div class="bg-green-600 h-6 rounded-full text-center text-white text-sm font-medium leading-6" style="width: ${(result.max_confidence * 100).toFixed(1)}%">
+                                    ${(result.max_confidence * 100).toFixed(1)}%
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                resultContainer.innerHTML = `
+                    <div class="result-animation bg-yellow-100 border-l-4 border-yellow-500 p-4 rounded-r-lg mb-6 text-yellow-800">
+                        <p class="font-bold flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                            ${result.message}
+                        </p>
+                    </div>
+                `;
+            }
+            
+            // Mostra l'immagine risultato
+            resultImage.src = result.result_image;
+            
+            // Aggiorna il link di download
+            downloadButton.href = result.result_image;
+            downloadButton.download = result.result_image.split('/').pop();
+        }
+        
+        function showError(errorMessage) {
+            loadingPlaceholder.classList.add('hidden');
+            resultContainer.classList.remove('hidden');
+            resultOutput.classList.add('hidden');
+            
+            resultContainer.innerHTML = `
+                <div class="result-animation bg-red-100 border-l-4 border-red-500 p-4 rounded-r-lg text-red-800">
+                    <p class="font-bold flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Errore
+                    </p>
+                    <p class="mt-2 text-sm">${errorMessage}</p>
+                </div>
+            `;
+        }
+        
+        // Inizializza la pagina
+        updateSensitivityLabel();
+    </script>
+</body>
+</html>
