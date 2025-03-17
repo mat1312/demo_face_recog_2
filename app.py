@@ -1,397 +1,532 @@
 import streamlit as st
 import face_recognition
-import cv2
-import os
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageDraw
+import os
+import time
 import io
 import base64
 
-# Configurazione della pagina Streamlit
+# Configurazione pagina Streamlit
 st.set_page_config(
-    page_title="Riconosciamo Giorgia Meloni",
-    page_icon="👩‍💼",
+    page_title="🇮🇹 Meloni Detector",
+    page_icon="🇮🇹",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# Stile CSS personalizzato
+# Stile CSS personalizzato con miglioramento della leggibilità
 st.markdown("""
 <style>
+    /* Stili generali */
+    body {
+        color: #ffffff;
+        background-color: #0e1117;
+    }
+    
     .main-title {
-        font-size: 42px;
+        color: #008C45; /* verde bandiera italiana */
+        text-align: center;
+        font-size: 3rem;
         font-weight: bold;
-        color: #3366cc;
-        text-align: center;
-        margin-bottom: 20px;
-        text-shadow: 1px 1px 2px #cccccc;
+        margin-bottom: 0.5rem;
+        text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
     }
-    .subtitle {
-        font-size: 20px;
-        color: #666666;
+    
+    .sub-title {
+        color: #CD212A; /* rosso bandiera italiana */
         text-align: center;
-        margin-bottom: 30px;
+        font-size: 1.5rem;
+        margin-bottom: 2rem;
+        font-style: italic;
     }
+    
+    /* Box per messaggi */
     .success-box {
         background-color: #d4edda;
+        border-left: 6px solid #28a745;
         color: #155724;
-        padding: 15px;
-        border-radius: 5px;
-        border-left: 5px solid #28a745;
-        margin-bottom: 20px;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        font-weight: bold;
+        font-size: 16px;
     }
-    .error-box {
-        background-color: #f8d7da;
-        color: #721c24;
-        padding: 15px;
-        border-radius: 5px;
-        border-left: 5px solid #dc3545;
-        margin-bottom: 20px;
+    
+    .warning-box {
+        background-color: #fff3cd;
+        border-left: 6px solid #ffc107;
+        color: #856404;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+        font-weight: bold;
+        font-size: 16px;
     }
+    
     .info-box {
-        background-color: #e2f0fd;
+        background-color: #e6f7ff;
+        border-left: 6px solid #1890ff;
+        padding: 1rem;
+        border-radius: 0.25rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1);
         color: #0c5460;
-        padding: 15px;
-        border-radius: 5px;
-        border-left: 5px solid #17a2b8;
-        margin-bottom: 20px;
+        font-weight: bold;
+        font-size: 16px;
     }
-    .result-card {
-        background-color: #f8f9fa;
+    
+    /* Miglioramento leggibilità dei panel bianchi */
+    .panel {
+        background-color: #ffffff;
         border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        padding: 1.5rem;
+        box-shadow: 0 3px 10px rgba(0,0,0,0.2);
+        margin-bottom: 1.5rem;
+        border: 1px solid #e0e0e0;
+        color: #333333;
+        font-size: 16px;
+        font-weight: 500;
     }
-    .stButton>button {
-        background-color: #4CAF50;
+    
+    /* Stile del pulsante di analisi */
+    .stButton button {
+        background-color: #1E88E5 !important; /* blu più gradevole */
+        color: white !important;
+        font-weight: bold !important;
+        border-radius: 20px !important;
+        padding: 0.5rem 2rem !important;
+        border: none !important;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.2) !important;
+        transition: all 0.3s ease !important;
+        font-size: 18px !important;
+    }
+    
+    .stButton button:hover {
+        background-color: #1565C0 !important; /* blu più scuro all'hover */
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* Stile per il pulsante di download */
+    .download-button {
+        margin-top: 1rem;
+    }
+    
+    /* Stile per il separatore */
+    hr {
+        margin: 2rem 0;
+        border: 0;
+        height: 1px;
+        background-image: linear-gradient(to right, rgba(0,0,0,0), rgba(0,0,0,0.2), rgba(0,0,0,0));
+    }
+    
+    /* Stile per i titoli delle sezioni */
+    .section-title {
+        color: #f8f9fa;
+        border-bottom: 2px solid #008C45;
+        padding-bottom: 0.5rem;
+        margin-bottom: 1rem;
+        font-weight: bold;
+        font-size: 1.5rem;
+    }
+    
+    /* Badge italiano */
+    .italian-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 50px;
+        background: linear-gradient(90deg, #008C45 33%, #F4F9F0 33%, #F4F9F0 66%, #CD212A 66%);
         color: white;
         font-weight: bold;
-        border: none;
-        padding: 10px 20px;
+        margin-right: 10px;
+    }
+    
+    /* Migliorare leggibilità messaggi informativi */
+    .stAlert > div {
+        font-size: 16px !important;
+        font-weight: 500 !important;
+        padding: 12px 16px !important;
+    }
+    
+    /* Evidenziare le metriche */
+    .stMetric {
+        background-color: rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .metric-label {
+        font-size: 18px !important;
+        font-weight: bold !important;
+        color: #f8f9fa !important;
+    }
+    
+    .metric-value {
+        font-size: 36px !important;
+        font-weight: bold !important;
+        color: #4CAF50 !important;
+    }
+    
+    /* Migliorare visibilità della legenda */
+    .legend-item {
+        display: flex;
+        align-items: center;
+        margin-bottom: 10px;
+        background-color: rgba(255, 255, 255, 0.9);
+        padding: 10px;
         border-radius: 5px;
-        width: 100%;
+        color: #333;
+        font-weight: 500;
     }
-    .stButton>button:hover {
-        background-color: #45a049;
-    }
-    .download-btn {
-        background-color: #3366cc !important;
-    }
-    .stSlider {
-        padding-top: 15px;
-        padding-bottom: 15px;
+    
+    .legend-color {
+        width: 20px;
+        height: 20px;
+        margin-right: 10px;
+        border: 1px solid rgba(0,0,0,0.2);
     }
 </style>
 """, unsafe_allow_html=True)
 
-def get_image_download_link(img, filename="risultato_meloni.jpg", text="Scarica l'immagine"):
-    """Genera un link per scaricare l'immagine"""
-    buffered = io.BytesIO()
-    img_pil = Image.fromarray(img)
-    img_pil.save(buffered, format="JPEG")
-    img_str = base64.b64encode(buffered.getvalue()).decode()
-    href = f'<a href="data:file/jpg;base64,{img_str}" download="{filename}" style="display: inline-block; padding: 10px 20px; background-color: #3366cc; color: white; text-decoration: none; border-radius: 5px; font-weight: bold; text-align: center; width: 100%;">{text}</a>'
-    return href
-
-def create_meloni_detector(reference_images_paths):
-    """Crea un rilevatore per Giorgia Meloni basato su immagini di riferimento locali."""
-    known_meloni_encodings = []
+# Funzione per il riconoscimento facciale
+def recognize_meloni(image, known_encodings, tolerance=0.58):
+    # Cerca tutti i volti nell'immagine
+    face_locations = face_recognition.face_locations(image)
     
-    with st.status("⏳ Caricamento delle immagini di riferimento di Giorgia Meloni...", expanded=False) as status:
-        # Processa ogni immagine di riferimento
-        for i, image_path in enumerate(reference_images_paths):
-            try:
-                status.update(label=f"⏳ Elaborazione immagine {i+1}/{len(reference_images_paths)}")
-                
-                # Carica l'immagine
-                image = cv2.imread(image_path)
-                if image is None:
-                    st.error(f"Impossibile caricare l'immagine {image_path}. Verifica che il percorso sia corretto.")
-                    continue
-                
-                # Face recognition funziona con RGB, ma OpenCV usa BGR
-                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                
-                # Trova i volti nell'immagine
-                face_locations = face_recognition.face_locations(rgb_image, model="hog")
-                
-                if not face_locations:
-                    status.update(label=f"⚠️ Nessun volto trovato nell'immagine {i+1}")
-                    continue
-                
-                # Prendi il primo volto trovato (assumiamo sia Meloni)
-                encodings = face_recognition.face_encodings(rgb_image, face_locations)
-                if encodings:
-                    known_meloni_encodings.append(encodings[0])
-                    status.update(label=f"✅ Encoding estratto con successo dall'immagine {i+1}")
-                else:
-                    status.update(label=f"❌ Impossibile estrarre encoding dall'immagine {i+1}")
-            
-            except Exception as e:
-                status.update(label=f"❌ Errore nell'immagine {i+1}: {e}")
-        
-        if not known_meloni_encodings:
-            status.update(label="❌ Impossibile creare rilevatore: nessun encoding valido", state="error")
-            return None
-        
-        status.update(label=f"✅ Rilevatore creato con {len(known_meloni_encodings)} encodings", state="complete")
-    
-    return known_meloni_encodings
-
-def detect_meloni(image, known_meloni_encodings, tolerance=0.6):
-    """
-    Rileva Giorgia Meloni in un'immagine.
-    
-    Args:
-        image: Può essere un percorso file o un'immagine già caricata (numpy array)
-        known_meloni_encodings: Lista di encodings facciali di riferimento
-        tolerance: Soglia di corrispondenza (più basso = più preciso)
-        
-    Returns:
-        Tuple (immagine con box, booleano se Meloni è stata trovata, numero di volti trovati)
-    """
-    meloni_trovata = False
-    num_volti = 0
-    
-    # Controlla se l'input è un percorso o un'immagine già caricata
-    if isinstance(image, str):
-        try:
-            # E' un percorso file
-            img = cv2.imread(image)
-            if img is None:
-                st.error(f"Impossibile caricare l'immagine {image}. Verifica che il percorso sia corretto.")
-                return None, False, 0
-        except Exception as e:
-            st.error(f"Errore durante il caricamento dell'immagine: {e}")
-            return None, False, 0
-    else:
-        # E' già un'immagine caricata
-        img = image.copy()
-    
-    # Converti in RGB (face_recognition usa RGB)
-    if len(img.shape) == 3 and img.shape[2] == 3:  # Verifica che sia un'immagine a colori
-        rgb_image = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    else:
-        rgb_image = img  # L'immagine potrebbe essere già in RGB
-    
-    # Trova tutti i volti nell'immagine
-    with st.spinner("🔍 Ricerca volti nell'immagine..."):
-        face_locations = face_recognition.face_locations(rgb_image, model="hog")
-        num_volti = len(face_locations)
-    
+    # Se non ci sono volti, restituisci l'immagine originale
     if not face_locations:
-        return img, False, 0
+        return Image.fromarray(image), [], "Nessun volto trovato nell'immagine."
     
-    # Calcola gli encodings per ogni volto trovato
-    face_encodings = face_recognition.face_encodings(rgb_image, face_locations)
+    # Ottieni le codifiche per tutti i volti trovati
+    face_encodings = face_recognition.face_encodings(image, face_locations)
     
-    # Confronta ogni volto con gli encodings di Meloni
-    for i, (face_encoding, face_location) in enumerate(zip(face_encodings, face_locations)):
-        # Controlla se il volto corrisponde a Meloni
-        matches = face_recognition.compare_faces(known_meloni_encodings, face_encoding, tolerance=tolerance)
+    # Crea un'immagine PIL per il disegno
+    pil_image = Image.fromarray(image)
+    draw = ImageDraw.Draw(pil_image)
+    
+    # Lista per tenere traccia dei volti di Meloni trovati
+    meloni_faces = []
+    
+    # Controlla ogni volto
+    for (top, right, bottom, left), face_encoding in zip(face_locations, face_encodings):
+        # Confronta con le codifiche note di Meloni
+        matches = face_recognition.compare_faces(known_encodings, face_encoding, tolerance=tolerance)
         
-        # Se almeno un riferimento corrisponde, è probabilmente Meloni
+        # Calcola la confidenza
+        face_distances = face_recognition.face_distance(known_encodings, face_encoding)
+        best_match_index = np.argmin(face_distances)
+        confidence = 1 - face_distances[best_match_index]
+        
+        # Se è una corrispondenza
         if True in matches:
-            meloni_trovata = True
-            # Estrai le coordinate
-            top, right, bottom, left = face_location
+            # Disegna un rettangolo verde
+            draw.rectangle(((left, top), (right, bottom)), outline=(0, 255, 0), width=4)
             
-            # Disegna un rettangolo
-            color = (0, 0, 255)  # Rosso in BGR
-            thickness = 3
-            cv2.rectangle(img, (left, top), (right, bottom), color, thickness)
+            # Aggiungi etichetta
+            label = f"Meloni ({confidence:.1%})"
+            text_height = 20
             
-            # Aggiungi etichetta con sfondo
-            label = "Giorgia Meloni"
-            font = cv2.FONT_HERSHEY_DUPLEX
-            font_scale = 0.8
-            font_thickness = 2
+            # Rettangolo per il testo
+            draw.rectangle(((left, bottom - text_height - 10), (right, bottom)), 
+                          fill=(0, 255, 0), outline=(0, 255, 0))
             
-            # Calcola le dimensioni del testo
-            (text_width, text_height), _ = cv2.getTextSize(label, font, font_scale, font_thickness)
+            # Testo
+            draw.text((left + 6, bottom - text_height - 5), label, fill=(0, 0, 0))
             
-            # Disegna sfondo per il testo
-            cv2.rectangle(img, (left, top - text_height - 10), (left + text_width, top), (0, 0, 255), -1)
-            
-            # Aggiungi testo
-            cv2.putText(img, label, (left, top - 5), font, font_scale, (255, 255, 255), font_thickness)
+            # Aggiungi alla lista di volti di Meloni
+            meloni_faces.append({
+                "location": (top, right, bottom, left),
+                "confidence": confidence
+            })
+        else:
+            # Disegna un rettangolo rosso per i non-Meloni
+            draw.rectangle(((left, top), (right, bottom)), outline=(255, 0, 0), width=2)
     
-    return img, meloni_trovata, num_volti
+    # Prepara il messaggio di risultato
+    if meloni_faces:
+        result_message = f"Trovate {len(meloni_faces)} istanze di Meloni nell'immagine!"
+    else:
+        result_message = "Meloni non trovata nell'immagine."
+    
+    return pil_image, meloni_faces, result_message
 
-def process_uploaded_image(uploaded_file):
-    """Elabora un file caricato in formato immagine numpy array."""
-    # Leggi il file caricato
-    file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
-    # Decodifica l'immagine
-    image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-    return image
+# Funzione per caricare le codifiche facciali di Meloni
+@st.cache_data
+def load_meloni_encodings(folder_path="meloni_images"):
+    encodings = []
+    image_count = 0
+    
+    if not os.path.exists(folder_path):
+        os.makedirs(folder_path)
+        st.warning(f"Cartella {folder_path} creata. Inserisci almeno un'immagine di Meloni.")
+        return encodings, image_count
+    
+    # Carica tutte le immagini nella cartella
+    for filename in os.listdir(folder_path):
+        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
+            image_path = os.path.join(folder_path, filename)
+            image_count += 1
+            
+            try:
+                image = face_recognition.load_image_file(image_path)
+                face_encodings = face_recognition.face_encodings(image)
+                
+                if len(face_encodings) > 0:
+                    encodings.append(face_encodings[0])
+            except Exception as e:
+                st.error(f"Errore nel caricamento di {filename}: {str(e)}")
+                
+    return encodings, image_count
 
+# Main
 def main():
-    # Titolo e sottotitolo con stile
-    st.markdown('<div class="main-title">👩‍💼 Riconoscitore Facciale di Giorgia Meloni</div>', unsafe_allow_html=True)
-    st.markdown('<div class="subtitle">Questa app individua il volto di Giorgia Meloni nelle foto e lo evidenzia con un box rosso.</div>', unsafe_allow_html=True)
+    # Intestazione
+    st.markdown('<p class="main-title">🇮🇹 Meloni Detector 🇮🇹</p>', unsafe_allow_html=True)
+    st.markdown('<p class="sub-title">Riconosci Giorgia Meloni in qualsiasi immagine</p>', unsafe_allow_html=True)
     
-    # Barra laterale con impostazioni
+    # Banner tricolore
+    st.markdown("""
+    <div style="background: linear-gradient(90deg, #008C45 33%, #F4F9F0 33%, #F4F9F0 66%, #CD212A 66%); 
+                height: 10px; margin-bottom: 2rem; border-radius: 5px;">
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Sidebar
     with st.sidebar:
-        st.image("https://upload.wikimedia.org/wikipedia/commons/f/fa/Giorgia_Meloni_Official_Portrait.jpg", 
-                 caption="Giorgia Meloni", use_container_width=True)
+        st.image("https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Flag_of_Italy.svg/320px-Flag_of_Italy.svg.png", use_container_width=True)
         
-        st.markdown("## ⚙️ Impostazioni")
+        st.markdown('<p class="section-title">Impostazioni</p>', unsafe_allow_html=True)
         
-        # Slider per la precisione
+        # Carica le codifiche di Meloni
+        meloni_encodings, image_count = load_meloni_encodings()
+        
+        if len(meloni_encodings) == 0:
+            st.warning("⚠️ Nessuna immagine valida trovata nella cartella 'meloni_images'.")
+            st.info("Inserisci alcune immagini di Giorgia Meloni nella cartella 'meloni_images' per iniziare.")
+            st.stop()
+        else:
+            st.success(f"✅ Caricate {len(meloni_encodings)} codifiche facciali da {image_count} immagini.")
+        
+        # Impostazioni di tolleranza con tooltip più descrittivo
         tolerance = st.slider(
-            "Precisione del riconoscimento", 
-            min_value=0.4, 
-            max_value=0.8, 
-            value=0.6, 
-            step=0.05,
-            help="Valori più bassi = riconoscimento più preciso, ma potrebbero esserci più falsi negativi"
+            "Livello di sensibilità",
+            min_value=0.1,
+            max_value=1.0,
+            value=0.58,
+            step=0.01,
+            help="Regola la sensibilità del riconoscimento. Valori più bassi = riconoscimento più preciso ma meno sensibile. Valori più alti = più possibilità di identificare Meloni, ma anche più falsi positivi."
         )
         
-        # Opzioni per l'utente
-        option = st.radio("Scegli un'opzione:", ["Usa immagine di default", "Carica un'immagine"])
-        
-        # Informazioni
-        st.markdown("---")
-        st.markdown("### 📝 Come funziona")
-        st.markdown("""
-        1. L'app utilizza il modello di riconoscimento facciale **face_recognition**
-        2. Confronta i volti rilevati con quelli di riferimento di Giorgia Meloni
-        3. Identifica e marca con un box rosso i volti che corrispondono
-        """)
-    
-    # Definisci i percorsi delle immagini di riferimento di Giorgia Meloni
-    # Assicurati che i percorsi siano corretti (uso / invece di \ per compatibilità)
-    reference_images = [
-        "reference_images/meloni1.jpg",
-        "reference_images/meloni2.jpg",
-        "reference_images/meloni3.jpg",
-        "reference_images/meloni4.jpg",
-        "reference_images/meloni5.jpg",
-        "reference_images/meloni6.jpg",
-        "reference_images/meloni.jpg",
-    ]
-    
-    # Filtra solo i percorsi che esistono
-    existing_references = [path for path in reference_images if os.path.exists(path)]
-    if not existing_references:
-        st.markdown('<div class="error-box">❌ Nessuna immagine di riferimento trovata! Verifica i percorsi delle immagini.</div>', unsafe_allow_html=True)
-        st.stop()
-    
-    # Inizializza il rilevatore
-    try:
-        detector_placeholder = st.empty()
-        with detector_placeholder.container():
-            known_meloni_encodings = create_meloni_detector(existing_references)
-            if not known_meloni_encodings:
-                st.markdown('<div class="error-box">❌ Impossibile creare il rilevatore. Verifica le immagini di riferimento.</div>', unsafe_allow_html=True)
-                st.stop()
-    except Exception as e:
-        st.markdown(f'<div class="error-box">❌ Errore nella creazione del rilevatore: {e}</div>', unsafe_allow_html=True)
-        st.stop()
-    
-    # Nascondi il placeholder dopo l'inizializzazione
-    detector_placeholder.empty()
-    
-    # Colonne per l'interfaccia
-    col1, col2 = st.columns(2)
-    
-    # Gestisci le diverse opzioni
-    if option == "Usa immagine di default":
-        # Percorso dell'immagine di test (uso / invece di \ per compatibilità)
-        test_image_path = "test_image/meloni_in_gruppo.jpg"
-        
-        if not os.path.exists(test_image_path):
-            col1.markdown(f'<div class="error-box">❌ Immagine di default non trovata: {test_image_path}</div>', unsafe_allow_html=True)
+        # Visualizzazione dello stato di sensibilità
+        if tolerance < 0.4:
+            st.info("🔍 Sensibilità: Molto precisa")
+        elif tolerance < 0.55:
+            st.info("🔍 Sensibilità: Precisa")
+        elif tolerance < 0.7:
+            st.info("🔍 Sensibilità: Bilanciata")
         else:
-            # Container per l'immagine originale
-            with col1.container():
-                st.markdown("### 📷 Immagine originale")
-                # Mostra l'immagine originale
-                image = cv2.imread(test_image_path)
-                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                st.image(rgb_image, caption="", use_container_width=True)
-                
-                # Pulsante per l'analisi
-                analyze_button = st.button("🔍 Analizza immagine", key="analyze_default")
-            
-            # Container per il risultato
-            with col2.container():
-                st.markdown("### 🔎 Risultato dell'analisi")
-                
-                result_placeholder = st.empty()
-                
-                if analyze_button:
-                    with st.spinner("🔄 Analisi in corso..."):
-                        # Rileva Meloni nell'immagine
-                        result_image, meloni_trovata, num_volti = detect_meloni(test_image_path, known_meloni_encodings, tolerance)
-                        
-                        if result_image is not None:
-                            # Converti in RGB per visualizzare
-                            result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
-                            
-                            # Mostra l'immagine risultante
-                            result_placeholder.image(result_rgb, use_container_width=True)
-                            
-                            # Mostra il risultato testuale
-                            if meloni_trovata:
-                                st.markdown(f'<div class="success-box">✅ <b>Giorgia Meloni è stata identificata!</b><br>Rilevati un totale di {num_volti} volti nell\'immagine.</div>', unsafe_allow_html=True)
-                            else:
-                                st.markdown(f'<div class="error-box">⚠️ <b>Giorgia Meloni non è stata trovata</b><br>Rilevati un totale di {num_volti} volti nell\'immagine.</div>', unsafe_allow_html=True)
-                            
-                            # Pulsante per scaricare il risultato
-                            st.markdown(get_image_download_link(result_rgb, "giorgia_meloni_rilevata.jpg", "📥 Scarica l'immagine risultante"), unsafe_allow_html=True)
-                        else:
-                            st.markdown('<div class="error-box">❌ Elaborazione dell\'immagine fallita.</div>', unsafe_allow_html=True)
-    
-    else:  # Carica un'immagine
-        # Container per l'upload
-        with col1.container():
-            st.markdown("### 📤 Carica la tua immagine")
-            uploaded_file = st.file_uploader("", type=["jpg", "jpeg", "png"])
-            
-            if uploaded_file is not None:
-                # Prepara l'immagine
-                image = process_uploaded_image(uploaded_file)
-                
-                # Mostra l'immagine caricata
-                rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                st.image(rgb_image, use_container_width=True)
-                
-                # Pulsante per l'analisi
-                analyze_button = st.button("🔍 Analizza immagine", key="analyze_upload")
-            else:
-                st.markdown('<div class="info-box">ℹ️ Carica un\'immagine JPG o PNG per iniziare l\'analisi.</div>', unsafe_allow_html=True)
-                analyze_button = False
+            st.info("🔍 Sensibilità: Alta (possibili falsi positivi)")
         
-        # Container per il risultato
-        with col2.container():
-            st.markdown("### 🔎 Risultato dell'analisi")
-            
-            result_placeholder = st.empty()
-            
-            if uploaded_file is not None and analyze_button:
-                with st.spinner("🔄 Analisi in corso..."):
-                    # Rileva Meloni nell'immagine
-                    result_image, meloni_trovata, num_volti = detect_meloni(image, known_meloni_encodings, tolerance)
-                    
-                    if result_image is not None:
-                        # Converti in RGB per visualizzare
-                        result_rgb = cv2.cvtColor(result_image, cv2.COLOR_BGR2RGB)
-                        
-                        # Mostra l'immagine risultante
-                        result_placeholder.image(result_rgb, use_container_width=True)
-                        
-                        # Mostra il risultato testuale
-                        if meloni_trovata:
-                            st.markdown(f'<div class="success-box">✅ <b>Giorgia Meloni è stata identificata!</b><br>Rilevati un totale di {num_volti} volti nell\'immagine.</div>', unsafe_allow_html=True)
-                        else:
-                            st.markdown(f'<div class="error-box">⚠️ <b>Giorgia Meloni non è stata trovata</b><br>Rilevati un totale di {num_volti} volti nell\'immagine.</div>', unsafe_allow_html=True)
-                        
-                        # Pulsante per scaricare il risultato
-                        st.markdown(get_image_download_link(result_rgb, "giorgia_meloni_rilevata.jpg", "📥 Scarica l'immagine risultante"), unsafe_allow_html=True)
+        # Modalità demo
+        st.markdown("---")
+        use_demo = st.checkbox("Usa immagine di dimostrazione", value=True)
+        
+        # Crediti
+        st.markdown("---")
+        st.markdown("### Info")
+        st.info(
+            "Questo tool utilizza face_recognition per identificare Giorgia Meloni nelle immagini. "
+            "Le immagini vengono elaborate localmente e non vengono caricate su server esterni."
+        )
+    
+    # Layout principale
+    col1, col2 = st.columns([1, 1], gap="large")
+    
+    # Colonna di input
+    with col1:
+        st.markdown('<p class="section-title">1. Seleziona un\'immagine</p>', unsafe_allow_html=True)
+        
+        # Descrizione migliorata e più visibile
+        st.markdown("""
+        <div class="panel" style="background-color: #e6f7ff; border-left: 6px solid #1890ff;">
+        <strong>Istruzioni:</strong> Puoi usare l'immagine demo o caricare la tua immagine personale per cercare Giorgia Meloni. 
+        Le foto con volti chiari e ben illuminati daranno i migliori risultati.
+        </div>
+        """, unsafe_allow_html=True)
+        
+        uploaded_image = None
+        
+        # Usa l'immagine demo o permetti upload
+        if use_demo:
+            if os.path.exists("foto_gruppo.jpg"):
+                uploaded_image = "foto_gruppo.jpg"
+                st.markdown("""
+                <div class="panel" style="color: #155724; background-color: #d4edda; border-left: 6px solid #28a745;">
+                <strong>✅ Usando l'immagine di dimostrazione</strong><br>
+                L'immagine di gruppo predefinita è stata caricata con successo.
+                </div>
+                """, unsafe_allow_html=True)
+                
+                # Contenitore per l'immagine
+                st.image("foto_gruppo.jpg", use_container_width=True, caption="Immagine di dimostrazione")
+            else:
+                st.markdown("""
+                <div class="panel" style="color: #721c24; background-color: #f8d7da; border-left: 6px solid #dc3545;">
+                <strong>⚠️ Immagine demo 'foto_gruppo.jpg' non trovata!</strong><br>
+                Inserisci un'immagine chiamata 'foto_gruppo.jpg' nella cartella del progetto o carica un'immagine personalizzata.
+                </div>
+                """, unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="panel">', unsafe_allow_html=True)
+            uploaded_file = st.file_uploader("Carica una foto", type=["jpg", "jpeg", "png"])
+            if uploaded_file is not None:
+                image_bytes = uploaded_file.getvalue()
+                uploaded_image = Image.open(io.BytesIO(image_bytes))
+                st.image(uploaded_image, caption="Immagine caricata", use_container_width=True)
+            else:
+                st.markdown("""
+                <div style="text-align: center; padding: 20px; color: #0c5460; background-color: #d1ecf1; border-radius: 5px; margin-top: 10px;">
+                <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" fill="currentColor" viewBox="0 0 16 16" style="margin-bottom: 10px;">
+                    <path d="M8 15A7 7 0 1 1 8 1a7 7 0 0 1 0 14zm0 1A8 8 0 1 0 8 0a8 8 0 0 0 0 16z"/>
+                    <path d="m8.93 6.588-2.29.287-.082.38.45.083c.294.07.352.176.288.469l-.738 3.468c-.194.897.105 1.319.808 1.319.545 0 1.178-.252 1.465-.598l.088-.416c-.2.176-.492.246-.686.246-.275 0-.375-.193-.304-.533L8.93 6.588zM9 4.5a1 1 0 1 1-2 0 1 1 0 0 1 2 0z"/>
+                </svg>
+                <br>
+                <strong>👆 Clicca sopra per caricare un'immagine</strong><br>
+                Supportati formati: JPG, JPEG, PNG
+                </div>
+                """, unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Colonna di output
+    with col2:
+        st.markdown('<p class="section-title">2. Analisi</p>', unsafe_allow_html=True)
+        
+        # Contenitore per il risultato con sfondo più chiaro per la leggibilità
+        st.markdown('<div class="panel" style="background-color: #ffffff;">', unsafe_allow_html=True)
+        
+        # Bottone più grande e centrato per avviare l'analisi
+        col_btn1, col_btn2, col_btn3 = st.columns([1, 2, 1])
+        with col_btn2:
+            analyze_button = st.button("🔍 Analizza immagine")
+        
+        if analyze_button and uploaded_image is not None:
+            with st.spinner("Analisi in corso... Ricerca volti e confronto con le codifiche note..."):
+                if isinstance(uploaded_image, str):
+                    # Se è l'immagine demo
+                    image = face_recognition.load_image_file(uploaded_image)
+                else:
+                    # Se è un'immagine caricata
+                    image_array = np.array(uploaded_image)
+                    image = image_array
+                
+                # Impostazione di una barra di progresso simulata
+                progress_bar = st.progress(0)
+                for percent_complete in range(101):
+                    # Aggiornamento della barra di progresso più lento sui passaggi che sembrano più importanti
+                    if percent_complete < 30:
+                        time.sleep(0.01)  # Ricerca volti
+                    elif percent_complete < 70:
+                        time.sleep(0.02)  # Analisi codifiche
                     else:
-                        st.markdown('<div class="error-box">❌ Elaborazione dell\'immagine fallita.</div>', unsafe_allow_html=True)
+                        time.sleep(0.005)  # Finalizzazione
+                    progress_bar.progress(percent_complete)
+                
+                # Esegui il riconoscimento
+                result_image, meloni_faces, result_message = recognize_meloni(image, meloni_encodings, tolerance)
+                
+                # Mostra il risultato con colori più intensi per migliorare la leggibilità
+                if meloni_faces:
+                    st.markdown(f"""
+                    <div style="background-color: #d4edda; border-left: 6px solid #28a745; color: #155724; 
+                    padding: 16px; border-radius: 4px; margin-bottom: 16px; font-size: 18px; font-weight: bold;">
+                    ✅ {result_message}
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Statistiche sul riconoscimento con colori più intensi
+                    if len(meloni_faces) > 0:
+                        max_confidence = max([face["confidence"] for face in meloni_faces]) * 100
+                        
+                        # Box per la metrica più visibile
+                        st.markdown(f"""
+                        <div style="background-color: #f8f9fa; color: #212529; padding: 15px; 
+                        border-radius: 8px; margin-bottom: 20px; text-align: center; box-shadow: 0 2px 5px rgba(0,0,0,0.1);">
+                            <div style="font-size: 16px; font-weight: 500; margin-bottom: 8px;">Confidenza massima</div>
+                            <div style="font-size: 28px; font-weight: 700; color: #28a745;">{max_confidence:.1f}%</div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                else:
+                    st.markdown(f"""
+                    <div style="background-color: #fff3cd; border-left: 6px solid #ffc107; color: #856404; 
+                    padding: 16px; border-radius: 4px; margin-bottom: 16px; font-size: 18px; font-weight: bold;">
+                    ❌ {result_message}
+                    </div>
+                    """, unsafe_allow_html=True)
+                
+                # Mostra l'immagine risultante
+                st.image(result_image, caption="Risultato analisi", use_container_width=True)
+                
+                # Salva l'immagine
+                timestamp = time.strftime("%Y%m%d_%H%M%S")
+                result_filename = f"risultato_{timestamp}.jpg"
+                result_image.save(result_filename)
+                
+                # Aggiunta stile per rendere più evidente il pulsante di download
+                st.markdown("""
+                <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; text-align: center; 
+                margin-top: 20px; border: 1px dashed #6c757d;">
+                """, unsafe_allow_html=True)
+                
+                # Aggiungi opzione per download con testo migliorato
+                with open(result_filename, "rb") as file:
+                    btn = st.download_button(
+                        label="⬇️ Scarica immagine risultato",
+                        data=file,
+                        file_name=result_filename,
+                        mime="image/jpeg"
+                    )
+                st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            # Messaggio più dettagliato e visibile per guidare l'utente
+            if uploaded_image is None and not use_demo:
+                st.markdown("""
+                <div style="background-color: #f8f9fa; border-left: 6px solid #6c757d; color: #495057; 
+                padding: 16px; border-radius: 4px; margin-bottom: 16px; font-size: 16px;">
+                <strong>📋 Passo 1:</strong> Prima carica un'immagine usando il selettore nella colonna a sinistra<br>
+                <strong>📋 Passo 2:</strong> Poi premi il pulsante 'Analizza immagine' per iniziare il riconoscimento
+                </div>
+                """, unsafe_allow_html=True)
+            else:
+                st.markdown("""
+                <div style="background-color: #e6f7ff; border-left: 6px solid #1890ff; color: #0c5460; 
+                padding: 16px; border-radius: 4px; margin-bottom: 16px; font-size: 16px;">
+                <strong>👆 Premi il pulsante 'Analizza immagine'</strong> per iniziare la ricerca di Meloni nell'immagine.<br>
+                L'algoritmo cercherà volti e li confronterà con le immagini di riferimento nella cartella 'meloni_images'.
+                </div>
+                """, unsafe_allow_html=True)
+        
+        st.markdown('</div>', unsafe_allow_html=True)
+        
+        # Legenda colorata con maggior contrasto per la leggibilità
+        st.markdown('<p class="section-title">Legenda</p>', unsafe_allow_html=True)
+        
+        # Pannello bianco per la legenda con testo scuro per massima leggibilità
+        st.markdown("""
+        <div class="panel" style="background-color: #ffffff; padding: 15px;">
+            <div style="display: flex; align-items: center; margin-bottom: 15px; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
+                <div style="width: 25px; height: 25px; background-color: #00FF00; margin-right: 15px; border: 1px solid #999;"></div>
+                <div style="color: #333; font-weight: bold; font-size: 16px;">Riquadro <span style="color: #28a745;">VERDE</span>: Meloni identificata</div>
+            </div>
+            <div style="display: flex; align-items: center; background-color: #f8f9fa; padding: 10px; border-radius: 5px;">
+                <div style="width: 25px; height: 25px; background-color: #FF0000; margin-right: 15px; border: 1px solid #999;"></div>
+                <div style="color: #333; font-weight: bold; font-size: 16px;">Riquadro <span style="color: #dc3545;">ROSSO</span>: Altra persona</div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
