@@ -168,6 +168,8 @@ async def get_status():
     }
 
 # Demo analysis endpoint with improved error handling
+# Replace just the analyze_demo function in your app.py file
+
 @app.get("/api/demo")
 async def analyze_demo(tolerance: float = 0.58):
     global MELONI_ENCODINGS
@@ -189,10 +191,20 @@ async def analyze_demo(tolerance: float = 0.58):
             raise HTTPException(status_code=404, detail=f"Demo image not found at any expected path")
     
     try:
-        # Process the demo image
+        # Load the image with PIL first, then convert to RGB if needed
         logger.info(f"Loading demo image from: {demo_path}")
-        image = face_recognition.load_image_file(demo_path)
-        result_image, meloni_faces, message = recognize_meloni(image, MELONI_ENCODINGS, tolerance)
+        pil_image = Image.open(demo_path)
+        
+        # Convert to RGB if not already
+        if pil_image.mode != 'RGB':
+            logger.info(f"Converting demo image from {pil_image.mode} to RGB")
+            pil_image = pil_image.convert('RGB')
+        
+        # Convert PIL Image to numpy array for face_recognition
+        image_array = np.array(pil_image)
+        
+        # Process the image using the numpy array
+        result_image, meloni_faces, message = recognize_meloni(image_array, MELONI_ENCODINGS, tolerance)
         
         # Save result image
         timestamp = time.strftime("%Y%m%d_%H%M%S")
