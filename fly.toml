@@ -1,12 +1,10 @@
-# fly.toml app configuration file generated for meloni-detector on 2025-03-17T15:44:21+01:00
+# fly.toml app configuration file generated for demo-face-recog-2 on 2025-03-17T15:16:58Z
 #
 # See https://fly.io/docs/reference/configuration/ for information about how to use this file.
 #
 
-app = 'meloni-detector'
+app = 'demo-face-recog-2'
 primary_region = 'cdg'
-kill_signal = 'SIGINT'
-kill_timeout = '5s'
 
 [build]
 
