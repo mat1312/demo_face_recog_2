@@ -133,6 +133,8 @@ async def get_status():
     }
 
 # Demo analysis endpoint
+# Update this function in your app.py file
+
 @app.get("/api/demo")
 async def analyze_demo(tolerance: float = 0.58):
     global MELONI_ENCODINGS
@@ -140,9 +142,10 @@ async def analyze_demo(tolerance: float = 0.58):
     if not MELONI_ENCODINGS:
         raise HTTPException(status_code=500, detail="No Meloni reference images found")
     
-    demo_path = "foto_gruppo.jpg"
+    # Fix the path to match the location in the static directory
+    demo_path = "static/foto_gruppo.jpg"
     if not os.path.exists(demo_path):
-        raise HTTPException(status_code=404, detail="Demo image not found")
+        raise HTTPException(status_code=404, detail=f"Demo image not found at path: {demo_path}")
     
     try:
         # Process the demo image
