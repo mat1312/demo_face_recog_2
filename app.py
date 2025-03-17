@@ -85,7 +85,7 @@ def recognize_meloni(image, known_encodings, tolerance=0.58):
     return pil_image, meloni_faces, result_message
 
 # Load Meloni face encodings
-def load_meloni_encodings(folder_path="meloni_images"):
+def load_meloni_encodings(folder_path="static/meloni_images"):
     encodings = []
     image_count = 0
     
