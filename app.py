@@ -12,6 +12,7 @@ import uvicorn
 from typing import List, Dict, Any, Optional
 import uuid
 import logging
+import tempfile
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -161,7 +162,7 @@ def load_meloni_encodings(folder_path="meloni_images_rgb"):
                         pil_image = pil_image.convert('RGB')
                         
                         # Save the converted image temporarily
-                        converted_path = os.path.join("/tmp", f"converted_{filename}")
+                        converted_path = os.path.join(tempfile.gettempdir(), f"converted_{filename}")
                         pil_image.save(converted_path, format="JPEG")
                         logger.info(f"Saved converted image to {converted_path}")
                         
@@ -270,7 +271,7 @@ async def analyze_demo(tolerance: float = 0.58):
             rgb_image.paste(original_image)
             
             # Save to a temporary file in JPEG format (which is always 8-bit RGB)
-            temp_path = os.path.join("/tmp", "temp_demo.jpg")
+            temp_path = os.path.join(tempfile.gettempdir(), "temp_demo.jpg")
             rgb_image.save(temp_path, format="JPEG", quality=95)
             logger.info(f"Saved temporary image to {temp_path}")
             
